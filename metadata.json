@@ -1,0 +1,6 @@
+{
+  "name": "RestaurantOS QR Ordering & Rewards",
+  "description": "Premium editorial restaurant QR dining interface with live ordering, item details, and customer loyalty stamps.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
