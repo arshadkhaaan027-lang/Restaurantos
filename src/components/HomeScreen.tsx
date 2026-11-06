@@ -15,10 +15,16 @@ import {
   ArrowRight,
   Star,
   Check,
+  Coffee,
+  Sun,
+  Sandwich,
 } from 'lucide-react';
 import { Dish, CartItem, Order } from '../types/restaurant';
 import { CATEGORIES, DISHES } from '../data/menuData';
-import { BottomNavigationWithOrderStrip } from './BottomNavigationWithOrderStrip';
+import {
+  BottomNavigationWithOrderStrip,
+  CustomerNavTab,
+} from './BottomNavigationWithOrderStrip';
 
 interface HomeScreenProps {
   onSelectDish: (dish: Dish) => void;
@@ -27,12 +33,14 @@ interface HomeScreenProps {
   onUpdateQuantity?: (dishId: string, delta: number) => void;
   onOpenCart: () => void;
   onOpenRewards: () => void;
+  onOpenProfile?: () => void;
   onOpenTablePicker?: () => void;
   currentTable: string;
-  activeNavTab: 'home' | 'rewards' | 'cart';
-  setActiveNavTab: (tab: 'home' | 'rewards' | 'cart') => void;
+  activeNavTab: CustomerNavTab;
+  setActiveNavTab: (tab: CustomerNavTab) => void;
   activeOrder?: Order | null;
   onOpenOrderStatus?: () => void;
+  dishes?: Dish[];
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -42,17 +50,21 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onUpdateQuantity,
   onOpenCart,
   onOpenRewards,
+  onOpenProfile,
   currentTable,
   activeNavTab,
   setActiveNavTab,
   activeOrder,
   onOpenOrderStatus,
+  dishes,
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
+  const activeDishesList = dishes && dishes.length > 0 ? dishes : DISHES;
+
   // Filter dishes by category and search
-  const filteredDishes = DISHES.filter((dish) => {
+  const filteredDishes = activeDishesList.filter((dish) => {
     const matchesCategory =
       selectedCategory === 'all' || dish.category === selectedCategory;
     const matchesSearch =
@@ -89,18 +101,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
   const getCategoryIcon = (iconName: string) => {
     switch (iconName) {
-      case 'beef':
-        return <Beef className="w-4 h-4" />;
-      case 'soup':
-        return <Soup className="w-4 h-4" />;
-      case 'flame':
-        return <Flame className="w-4 h-4" />;
-      case 'sparkles':
-        return <Sparkles className="w-4 h-4" />;
-      case 'wine':
-        return <Wine className="w-4 h-4" />;
+      case 'coffee':
+        return <Coffee className="w-4 h-4" />;
+      case 'sun':
+        return <Sun className="w-4 h-4" />;
+      case 'sandwich':
+        return <Sandwich className="w-4 h-4" />;
       case 'cake':
         return <Cake className="w-4 h-4" />;
+      case 'wine':
+        return <Wine className="w-4 h-4" />;
+      case 'sparkles':
+        return <Sparkles className="w-4 h-4" />;
+      case 'flame':
+        return <Flame className="w-4 h-4" />;
       default:
         return <UtensilsCrossed className="w-4 h-4" />;
     }
@@ -171,19 +185,27 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <button
             type="button"
             onClick={onOpenOrderStatus}
-            className="w-full mt-2.5 bg-black/30 hover:bg-black/45 text-white rounded-xl p-2 px-3 flex items-center justify-between border border-amber-300/40 text-xs shadow-inner cursor-pointer group transition-all animate-in fade-in duration-200"
+            className="w-full mt-2.5 bg-black/35 hover:bg-black/50 text-white rounded-xl p-2 px-3 flex items-center justify-between border border-amber-300/40 text-xs shadow-inner cursor-pointer group transition-all animate-in fade-in duration-200"
           >
             <div className="flex items-center gap-2 min-w-0">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
               <span className="font-bold text-amber-200 truncate">
-                Ticket #{activeOrder.ticketNumber} in Kitchen
+                {activeOrder.status === 'accepted'
+                  ? '✓ Order Accepted by Kitchen'
+                  : activeOrder.status === 'preparing'
+                  ? '☕ Brewing & Prepping Fresh'
+                  : activeOrder.status === 'ready'
+                  ? '✨ Ready at Counter (Awaiting Server)'
+                  : activeOrder.status === 'served'
+                  ? '🎉 Served to Table'
+                  : `Ticket #${activeOrder.ticketNumber} Sent`}
               </span>
               <span className="text-[10px] text-white/70 shrink-0">
-                ~{activeOrder.estimatedMinutes} min
+                {activeOrder.table}
               </span>
             </div>
             <span className="text-[10px] font-bold text-amber-300 group-hover:translate-x-0.5 transition-transform shrink-0">
-              Track ➔
+              Live Status ➔
             </span>
           </button>
         )}
@@ -355,7 +377,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                     {/* BOTTOM ACTION BAR: COMPLETELY ISOLATED - CANNOT TRIGGER onSelectDish */}
                     <div className="mt-2.5 flex items-center justify-between pt-1 border-t border-stone-100">
-                      {isSelected ? (
+                      {dish.isAvailable === false ? (
+                        <span className="text-[9px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-md w-full text-center">
+                          Sold Out
+                        </span>
+                      ) : isSelected ? (
                         <>
                           {/* Selected Label */}
                           <span className="text-[10px] font-bold text-[#82181a]">
@@ -488,7 +514,11 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
                       {/* BOTTOM ISOLATED ACTION BAR */}
                       <div className="mt-2.5 flex items-center justify-between pt-1 border-t border-stone-100">
-                        {isSelected ? (
+                        {dish.isAvailable === false ? (
+                          <span className="text-[9px] font-bold text-stone-500 bg-stone-100 px-2 py-0.5 rounded-md w-full text-center">
+                            Sold Out
+                          </span>
+                        ) : isSelected ? (
                           <>
                             <span className="text-[10px] font-bold text-[#82181a]">
                               In Order
@@ -540,13 +570,15 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
 
 
-      {/* 3-TAB PERMANENT BOTTOM NAVIGATION & FLOATING ORDER STRIP (Only visible when items are selected) */}
+      {/* 4-TAB PERMANENT BOTTOM NAVIGATION & FLOATING ORDER STRIP */}
       <BottomNavigationWithOrderStrip
         cartItems={cartItems}
         onOpenCart={onOpenCart}
         onOpenRewards={onOpenRewards}
+        onOpenProfile={onOpenProfile}
         onNavigateHome={() => setActiveNavTab('home')}
         activeTab={activeNavTab}
+        setActiveTab={setActiveNavTab}
         currentTable={currentTable}
       />
     </div>

@@ -1,0 +1,200 @@
+{
+  "entities": {
+    "Customer": {
+      "title": "Customer Profile",
+      "description": "User customer profile associated with a specific cafe and Firebase Auth UID",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "cafeId": { "type": "string", "description": "Associated cafe tenant ID" },
+        "fullName": { "type": "string", "maxLength": 100, "description": "Customer full name" },
+        "email": { "type": "string", "maxLength": 120, "description": "Customer email address" },
+        "phone": { "type": "string", "maxLength": 20, "description": "Customer mobile phone number" },
+        "dateOfBirth": { "type": "string", "maxLength": 20, "description": "Customer date of birth (YYYY-MM-DD)" },
+        "photoURL": { "type": "string", "maxLength": 2048, "description": "Customer profile picture URL or base64 storage" },
+        "favouriteDishes": { "type": "array", "description": "List of favorite dish IDs" },
+        "createdAt": { "type": "string", "description": "Profile creation timestamp ISO string" },
+        "updatedAt": { "type": "string", "description": "Profile update timestamp ISO string" }
+      },
+      "required": ["uid", "cafeId", "fullName"]
+    },
+    "Dish": {
+      "title": "Menu Product / Dish",
+      "description": "Restaurant menu dish with pricing, availability, and recipes",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Unique dish identifier" },
+        "cafeId": { "type": "string", "description": "Associated cafe ID" },
+        "name": { "type": "string", "maxLength": 100, "description": "Dish title" },
+        "category": { "type": "string", "maxLength": 50, "description": "Menu category" },
+        "price": { "type": "number", "description": "Price in currency units" },
+        "rating": { "type": "number", "description": "Star rating out of 5" },
+        "reviewCount": { "type": "integer", "description": "Count of customer reviews" },
+        "description": { "type": "string", "maxLength": 500, "description": "Culinary description" },
+        "image": { "type": "string", "maxLength": 2048, "description": "Dish photography URL" },
+        "isBestSeller": { "type": "boolean", "description": "Featured bestseller badge" },
+        "isAvailable": { "type": "boolean", "description": "Availability toggle (86'd status)" },
+        "isTodaySpecial": { "type": "boolean", "description": "Highlighted as Today's Chef Special" },
+        "discountPercent": { "type": "number", "description": "Special promo discount %" },
+        "calories": { "type": "string", "maxLength": 30, "description": "Calorie count" },
+        "prepTime": { "type": "string", "maxLength": 30, "description": "Estimated prep duration" }
+      },
+      "required": ["id", "name", "category", "price"]
+    },
+    "InventoryItem": {
+      "title": "Inventory Raw Ingredient",
+      "description": "Stock tracking item with thresholds, unit costs, and supplier info",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "description": "Inventory SKU identifier" },
+        "cafeId": { "type": "string", "description": "Associated cafe ID" },
+        "name": { "type": "string", "maxLength": 100, "description": "Ingredient or item name" },
+        "category": { "type": "string", "maxLength": 50, "description": "Inventory category" },
+        "currentStock": { "type": "number", "description": "Current inventory balance" },
+        "minThreshold": { "type": "number", "description": "Low-stock alert threshold" },
+        "unit": { "type": "string", "maxLength": 20, "description": "Measurement unit (kg, ltr, pcs, packs)" },
+        "unitCost": { "type": "number", "description": "Purchase cost per unit" },
+        "supplier": { "type": "string", "maxLength": 100, "description": "Primary supplier name" },
+        "expiryDate": { "type": "string", "maxLength": 30, "description": "Next batch expiry date" },
+        "lastRestocked": { "type": "string", "description": "Last restock timestamp" }
+      },
+      "required": ["id", "name", "currentStock", "unit"]
+    },
+    "Offer": {
+      "title": "Promotional Offer / Coupon",
+      "description": "Promotional discount campaign or coupon code",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string", "maxLength": 30, "description": "Coupon promo code" },
+        "cafeId": { "type": "string", "description": "Associated cafe ID" },
+        "title": { "type": "string", "maxLength": 100, "description": "Offer title" },
+        "description": { "type": "string", "maxLength": 300, "description": "Terms and conditions" },
+        "discountType": { "type": "string", "enum": ["percentage", "fixed"], "description": "Discount calculation type" },
+        "discountValue": { "type": "number", "description": "Percentage or fixed amount" },
+        "minOrder": { "type": "number", "description": "Minimum subtotal required" },
+        "isActive": { "type": "boolean", "description": "Offer status" }
+      },
+      "required": ["code", "title", "discountType", "discountValue", "minOrder"]
+    },
+    "LoyaltyMembership": {
+      "title": "Loyalty Membership",
+      "description": "Customer loyalty club membership card and stamp balance for a specific cafe",
+      "type": "object",
+      "properties": {
+        "membershipId": { "type": "string", "maxLength": 50, "description": "Unique membership identifier (e.g. ROS-M-123456)" },
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "cafeId": { "type": "string", "description": "Associated cafe tenant ID" },
+        "fullName": { "type": "string", "maxLength": 100, "description": "Customer full name" },
+        "whatsappNumber": { "type": "string", "maxLength": 20, "description": "Verified WhatsApp number for alerts and stamps" },
+        "email": { "type": "string", "maxLength": 120, "description": "Customer email" },
+        "dateOfBirth": { "type": "string", "maxLength": 20, "description": "Date of birth" },
+        "stamps": { "type": "integer", "description": "Current stamp balance (0 to 10)" },
+        "stampedOrderIds": { "type": "array", "description": "List of order IDs that have already received stamps" },
+        "joinedAt": { "type": "string", "description": "Membership join timestamp" },
+        "updatedAt": { "type": "string", "description": "Last balance update timestamp" }
+      },
+      "required": ["membershipId", "uid", "cafeId", "fullName", "whatsappNumber", "stamps"]
+    },
+    "Order": {
+      "title": "Kitchen Table Order",
+      "description": "Live restaurant order placed from table QR code",
+      "type": "object",
+      "properties": {
+        "orderId": { "type": "string", "maxLength": 64, "description": "Unique order ID" },
+        "ticketNumber": { "type": "integer", "description": "Kitchen display ticket number" },
+        "cafeId": { "type": "string", "description": "Cafe branch ID" },
+        "customerId": { "type": "string", "description": "Customer Firebase Auth UID" },
+        "customerPhone": { "type": "string", "maxLength": 20, "description": "Customer contact phone" },
+        "table": { "type": "string", "maxLength": 30, "description": "Table identifier (e.g. Table 14)" },
+        "items": { "type": "array", "description": "Array of ordered cart items" },
+        "subtotal": { "type": "number", "description": "Subtotal before taxes and discounts" },
+        "tax": { "type": "number", "description": "Computed taxes" },
+        "service": { "type": "number", "description": "Service charge" },
+        "discount": { "type": "number", "description": "Coupon discount amount" },
+        "couponCode": { "type": "string", "maxLength": 30, "description": "Applied promo code" },
+        "total": { "type": "number", "description": "Final total bill in INR" },
+        "status": { "type": "string", "enum": ["received", "accepted", "preparing", "woodfire", "ready", "served", "cancelled"], "description": "Current kitchen lifecycle status" },
+        "kitchenNotes": { "type": "string", "maxLength": 300, "description": "Special preparation instructions" },
+        "whatsappOptIn": { "type": "boolean", "description": "Customer opted in to WhatsApp e-bill" },
+        "stampAwarded": { "type": "boolean", "description": "Whether a loyalty stamp was granted for this order" },
+        "acceptedAt": { "type": "number", "description": "Order accepted by owner epoch timestamp" },
+        "preparingAt": { "type": "number", "description": "Order prep started epoch timestamp" },
+        "readyAt": { "type": "number", "description": "Order plated/ready epoch timestamp" },
+        "servedAt": { "type": "number", "description": "Order served to table epoch timestamp" },
+        "customerEmail": { "type": "string", "maxLength": 120, "description": "Customer email if enrolled" },
+        "customerName": { "type": "string", "maxLength": 100, "description": "Customer name if known" },
+        "isMember": { "type": "boolean", "description": "Whether customer has joined membership with phone or email" },
+        "createdAt": { "type": "number", "description": "Order creation epoch milliseconds" },
+        "updatedAt": { "type": "number", "description": "Last status update epoch milliseconds" }
+      },
+      "required": ["orderId", "ticketNumber", "cafeId", "table", "total", "status", "createdAt"]
+    },
+    "StampTransaction": {
+      "title": "Loyalty Stamp Transaction",
+      "description": "Auditable log of loyalty stamps awarded or reversed",
+      "type": "object",
+      "properties": {
+        "transactionId": { "type": "string", "maxLength": 64, "description": "Unique transaction ID" },
+        "cafeId": { "type": "string", "description": "Associated cafe ID" },
+        "customerId": { "type": "string", "description": "Customer UID" },
+        "orderId": { "type": "string", "description": "Associated restaurant order ID" },
+        "type": { "type": "string", "enum": ["award", "reversal"], "description": "Transaction action type" },
+        "stampsDelta": { "type": "integer", "description": "+1 for award, -1 for reversal" },
+        "reason": { "type": "string", "maxLength": 200, "description": "Reason for award or cancellation reversal" },
+        "timestamp": { "type": "number", "description": "Epoch timestamp" }
+      },
+      "required": ["transactionId", "cafeId", "customerId", "orderId", "type", "stampsDelta", "timestamp"]
+    },
+    "CustomerNotification": {
+      "title": "Customer Notification",
+      "description": "Real-time kitchen status alerts and order updates for customer",
+      "type": "object",
+      "properties": {
+        "notificationId": { "type": "string", "maxLength": 64, "description": "Notification ID" },
+        "cafeId": { "type": "string", "description": "Cafe ID" },
+        "customerId": { "type": "string", "description": "Target customer UID" },
+        "orderId": { "type": "string", "description": "Referenced order ID" },
+        "title": { "type": "string", "maxLength": 100, "description": "Notification title" },
+        "message": { "type": "string", "maxLength": 300, "description": "Notification body" },
+        "status": { "type": "string", "description": "Corresponding order status" },
+        "read": { "type": "boolean", "description": "Whether customer has viewed notification" },
+        "timestamp": { "type": "number", "description": "Epoch timestamp" }
+      },
+      "required": ["notificationId", "cafeId", "customerId", "title", "message", "timestamp"]
+    }
+  },
+  "firestore": {
+    "/cafes/{cafeId}/customers/{customerId}": {
+      "schema": { "$ref": "#/entities/Customer" },
+      "description": "Customer profile under tenant cafe"
+    },
+    "/cafes/{cafeId}/dishes/{dishId}": {
+      "schema": { "$ref": "#/entities/Dish" },
+      "description": "Menu dishes published by owner"
+    },
+    "/cafes/{cafeId}/inventory/{itemId}": {
+      "schema": { "$ref": "#/entities/InventoryItem" },
+      "description": "Inventory stock items"
+    },
+    "/cafes/{cafeId}/offers/{offerId}": {
+      "schema": { "$ref": "#/entities/Offer" },
+      "description": "Promotional offers and coupons"
+    },
+    "/cafes/{cafeId}/memberships/{customerId}": {
+      "schema": { "$ref": "#/entities/LoyaltyMembership" },
+      "description": "Loyalty membership records keyed by customer UID"
+    },
+    "/cafes/{cafeId}/orders/{orderId}": {
+      "schema": { "$ref": "#/entities/Order" },
+      "description": "Table orders for cafe kitchen and customer tracking"
+    },
+    "/cafes/{cafeId}/stamp_transactions/{transactionId}": {
+      "schema": { "$ref": "#/entities/StampTransaction" },
+      "description": "Auditable stamp log for cafe"
+    },
+    "/cafes/{cafeId}/notifications/{notificationId}": {
+      "schema": { "$ref": "#/entities/CustomerNotification" },
+      "description": "Customer notifications for cafe"
+    }
+  }
+}

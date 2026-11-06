@@ -14,6 +14,7 @@ interface TriptychViewProps {
   onUpdateQuantity?: (dishId: string, delta: number) => void;
   onOpenCart: () => void;
   onOpenRewards: () => void;
+  onOpenProfile?: () => void;
   currentTable: string;
   onNavigateToHome: () => void;
 }
@@ -26,6 +27,7 @@ export const TriptychView: React.FC<TriptychViewProps> = ({
   onUpdateQuantity,
   onOpenCart,
   onOpenRewards,
+  onOpenProfile,
   currentTable,
   onNavigateToHome,
 }) => {
@@ -62,6 +64,7 @@ export const TriptychView: React.FC<TriptychViewProps> = ({
               onUpdateQuantity={onUpdateQuantity}
               onOpenCart={onOpenCart}
               onOpenRewards={onOpenRewards}
+              onOpenProfile={onOpenProfile || onOpenRewards}
               currentTable={currentTable}
               activeNavTab="home"
               setActiveNavTab={() => {}}

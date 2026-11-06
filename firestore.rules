@@ -1,0 +1,104 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Default deny all
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    // Cafe customer profiles:
+    // Customers can read and update only their own profile
+    match /cafes/{cafeId}/customers/{customerId} {
+      allow get: if isOwner(customerId);
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isOwner(customerId)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.cafeId == cafeId;
+      allow update: if isOwner(customerId)
+        && request.resource.data.uid == resource.data.uid
+        && request.resource.data.cafeId == resource.data.cafeId;
+      allow delete: if false;
+    }
+
+    // Cafe loyalty memberships:
+    // Customers can read their own membership and register once.
+    match /cafes/{cafeId}/memberships/{customerId} {
+      allow get: if isOwner(customerId);
+      allow list: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow create: if isOwner(customerId)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.cafeId == cafeId;
+      allow update: if isSignedIn()
+        && (isOwner(customerId) || request.auth != null);
+      allow delete: if false;
+    }
+
+    // Orders placed in cafe:
+    // Customer can create and read their orders. Kitchen staff/any signed-in dining session can access active orders for that cafe.
+    match /cafes/{cafeId}/orders/{orderId} {
+      allow get: if isSignedIn();
+      allow list: if isSignedIn();
+      allow create: if isSignedIn()
+        && request.resource.data.cafeId == cafeId;
+      allow update: if isSignedIn()
+        && request.resource.data.cafeId == resource.data.cafeId;
+      allow delete: if false;
+    }
+
+    // Auditable stamp transactions:
+    match /cafes/{cafeId}/stamp_transactions/{transactionId} {
+      allow get: if isSignedIn() && (resource.data.customerId == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    // Notifications:
+    match /cafes/{cafeId}/notifications/{notificationId} {
+      allow get: if isSignedIn() && (resource.data.customerId == request.auth.uid);
+      allow list: if isSignedIn() && (resource.data.customerId == request.auth.uid);
+      allow create: if isSignedIn();
+      allow update: if isSignedIn() && (resource.data.customerId == request.auth.uid);
+      allow delete: if false;
+    }
+
+    // Menu dishes:
+    // Public read for QR diners, signed-in staff/owner can modify
+    match /cafes/{cafeId}/dishes/{dishId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Inventory items and stock:
+    match /cafes/{cafeId}/inventory/{itemId} {
+      allow read, write: if isSignedIn();
+    }
+
+    // Offers and Promotions:
+    // Public read for QR diners, signed-in staff/owner can modify
+    match /cafes/{cafeId}/offers/{offerId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Cafe QR Menu Customization & Config:
+    match /cafes/{cafeId}/config/{configId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Suppliers & Purchases:
+    match /cafes/{cafeId}/suppliers/{supplierId} {
+      allow read, write: if isSignedIn();
+    }
+  }
+}

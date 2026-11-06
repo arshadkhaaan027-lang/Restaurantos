@@ -3,12 +3,14 @@ import { Wifi, BatteryMedium, Signal } from 'lucide-react';
 
 interface PhoneFrameProps {
   children: React.ReactNode;
+  overlay?: React.ReactNode;
   currentTime?: string;
   className?: string;
 }
 
 export const PhoneFrame: React.FC<PhoneFrameProps> = ({
   children,
+  overlay,
   currentTime = '9:41',
   className = '',
 }) => {
@@ -47,6 +49,9 @@ export const PhoneFrame: React.FC<PhoneFrameProps> = ({
         <div className="relative z-40 pb-2 pt-1 flex justify-center bg-transparent pointer-events-none">
           <div className="w-32 h-1 bg-neutral-400/80 rounded-full"></div>
         </div>
+
+        {/* Screen Overlays (Confined to Mobile Frame) */}
+        {overlay}
       </div>
     </div>
   );

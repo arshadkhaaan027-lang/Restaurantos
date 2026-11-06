@@ -4,18 +4,20 @@ import {
   Award,
   ShoppingBag,
   ArrowRight,
-  Receipt,
-  Sparkles,
+  User as UserIcon,
 } from 'lucide-react';
 import { CartItem } from '../types/restaurant';
+
+export type CustomerNavTab = 'home' | 'rewards' | 'cart' | 'profile';
 
 interface BottomNavigationWithOrderStripProps {
   cartItems: CartItem[];
   onOpenCart: () => void;
   onOpenRewards: () => void;
+  onOpenProfile?: () => void;
   onNavigateHome: () => void;
-  activeTab: 'home' | 'rewards' | 'cart';
-  setActiveTab?: (tab: 'home' | 'rewards' | 'cart') => void;
+  activeTab: CustomerNavTab;
+  setActiveTab?: (tab: CustomerNavTab) => void;
   currentTable: string;
 }
 
@@ -25,6 +27,7 @@ export const BottomNavigationWithOrderStrip: React.FC<
   cartItems,
   onOpenCart,
   onOpenRewards,
+  onOpenProfile,
   onNavigateHome,
   activeTab,
   currentTable,
@@ -56,9 +59,8 @@ export const BottomNavigationWithOrderStrip: React.FC<
   return (
     <>
       {/* FLOATING ORDER SUMMARY STRIP ("PATTI") */}
-      {/* Elevated luxury design with rich velvet wine gradient, gold accents & INR pricing */}
       {totalCartCount > 0 && (
-        <div className="absolute bottom-[62px] inset-x-2.5 z-30 animate-in slide-in-from-bottom-3 duration-200">
+        <div className="absolute bottom-[60px] inset-x-2.5 z-30 animate-in slide-in-from-bottom-3 duration-200">
           <button
             type="button"
             onClick={onOpenCart}
@@ -92,7 +94,7 @@ export const BottomNavigationWithOrderStrip: React.FC<
               </div>
             </div>
 
-            {/* Right side: Clickable Luxury "View Order" action button */}
+            {/* Right side: Luxury "View Order" action button */}
             <div className="flex items-center gap-1.5 bg-gradient-to-r from-amber-300 via-amber-200 to-amber-300 hover:from-amber-200 hover:to-white text-stone-950 px-3.5 py-1.5 rounded-xl text-xs font-bold shadow-md group-hover:scale-102 transition-all shrink-0">
               <ShoppingBag className="w-3.5 h-3.5 text-stone-900 stroke-[2.3]" />
               <span className="tracking-tight">View Order</span>
@@ -102,31 +104,31 @@ export const BottomNavigationWithOrderStrip: React.FC<
         </div>
       )}
 
-      {/* 3-TAB PERMANENT BOTTOM NAVIGATION BAR */}
-      {/* Home, Rewards, Cart (Table section removed as requested since table is QR-linked) */}
-      <div className="absolute bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur-md border-t border-stone-200/80 px-8 py-2 shadow-lg">
-        <div className="grid grid-cols-3 max-w-xs mx-auto items-center">
+      {/* 4-TAB PERMANENT BOTTOM NAVIGATION BAR */}
+      {/* Home | Rewards | Cart | Profile */}
+      <div className="absolute bottom-0 inset-x-0 z-20 bg-white/95 backdrop-blur-md border-t border-stone-200/80 px-3 py-2 shadow-lg">
+        <div className="grid grid-cols-4 max-w-sm mx-auto items-center">
           {/* 1. Home Tab */}
           <button
             type="button"
             onClick={onNavigateHome}
-            className={`flex flex-col items-center gap-0.5 transition-colors cursor-pointer ${
+            className={`flex flex-col items-center gap-0.5 transition-colors cursor-pointer py-1 ${
               activeTab === 'home'
-                ? 'text-[#82181a]'
+                ? 'text-[#82181a] font-bold'
                 : 'text-stone-400 hover:text-stone-600'
             }`}
           >
             <HomeIcon className="w-5 h-5 fill-current stroke-[1.8]" />
-            <span className="text-[10px] font-semibold tracking-tight">Home</span>
+            <span className="text-[10px] tracking-tight">Home</span>
           </button>
 
           {/* 2. Rewards Tab (Loyalty Stamps) */}
           <button
             type="button"
             onClick={onOpenRewards}
-            className={`flex flex-col items-center gap-0.5 transition-colors cursor-pointer relative ${
+            className={`flex flex-col items-center gap-0.5 transition-colors cursor-pointer py-1 relative ${
               activeTab === 'rewards'
-                ? 'text-[#82181a]'
+                ? 'text-[#82181a] font-bold'
                 : 'text-stone-400 hover:text-stone-600'
             }`}
           >
@@ -134,18 +136,16 @@ export const BottomNavigationWithOrderStrip: React.FC<
               <Award className="w-5 h-5 stroke-[2]" />
               <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
             </div>
-            <span className="text-[10px] font-semibold tracking-tight">
-              Rewards
-            </span>
+            <span className="text-[10px] tracking-tight">Rewards</span>
           </button>
 
           {/* 3. Cart Tab (Opens Bill & Order) */}
           <button
             type="button"
             onClick={onOpenCart}
-            className={`flex flex-col items-center gap-0.5 transition-colors cursor-pointer relative ${
+            className={`flex flex-col items-center gap-0.5 transition-colors cursor-pointer py-1 relative ${
               activeTab === 'cart'
-                ? 'text-[#82181a]'
+                ? 'text-[#82181a] font-bold'
                 : 'text-stone-400 hover:text-stone-600'
             }`}
           >
@@ -157,7 +157,21 @@ export const BottomNavigationWithOrderStrip: React.FC<
                 </span>
               )}
             </div>
-            <span className="text-[10px] font-semibold tracking-tight">Cart</span>
+            <span className="text-[10px] tracking-tight">Cart</span>
+          </button>
+
+          {/* 4. Profile Tab (Customer Account & Loyalty) */}
+          <button
+            type="button"
+            onClick={onOpenProfile || onOpenRewards}
+            className={`flex flex-col items-center gap-0.5 transition-colors cursor-pointer py-1 relative ${
+              activeTab === 'profile'
+                ? 'text-[#82181a] font-bold'
+                : 'text-stone-400 hover:text-stone-600'
+            }`}
+          >
+            <UserIcon className="w-5 h-5 stroke-[2]" />
+            <span className="text-[10px] tracking-tight">Profile</span>
           </button>
         </div>
       </div>

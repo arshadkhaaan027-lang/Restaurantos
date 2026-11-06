@@ -13,6 +13,12 @@ import {
   Clock,
   Sparkles,
   QrCode,
+  User,
+  ChefHat,
+  Bell,
+  MapPin,
+  ChevronDown,
+  LayoutDashboard,
 } from 'lucide-react';
 import { PhoneFrame } from './components/PhoneFrame';
 import { OnboardingScreen } from './components/OnboardingScreen';
@@ -20,23 +26,73 @@ import { HomeScreen } from './components/HomeScreen';
 import { ProductDetailScreen } from './components/ProductDetailScreen';
 import { RewardsScreen } from './components/RewardsScreen';
 import { OrderStatusScreen } from './components/OrderStatusScreen';
+import { CustomerProfileScreen } from './components/CustomerProfileScreen';
+import { CustomerAuthModal } from './components/CustomerAuthModal';
+import { KitchenKdsDrawer } from './components/KitchenKdsDrawer';
+import { CustomerNotificationBanner } from './components/CustomerNotificationBanner';
 import { CartDrawer } from './components/CartDrawer';
 import { TriptychView } from './components/TriptychView';
+import { CustomerNavTab } from './components/BottomNavigationWithOrderStrip';
+import { OwnerDashboard } from './components/dashboard/OwnerDashboard';
 import { Dish, CartItem, Order, OrderStatus } from './types/restaurant';
 import { DISHES } from './data/menuData';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import {
+  updateKitchenOrderStatus,
+  SUPPORTED_CAFES,
+  listenToCafeOrders,
+  listenToDishes,
+} from './services/restaurantService';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from './services/firebase';
 
 type ViewMode = 'interactive' | 'triptych' | 'responsive';
-type ScreenType = 'onboarding' | 'home' | 'detail' | 'rewards' | 'order_status';
-type NavTab = 'home' | 'rewards' | 'cart';
+type ScreenType =
+  | 'onboarding'
+  | 'home'
+  | 'detail'
+  | 'rewards'
+  | 'order_status'
+  | 'profile';
 
 const DEMO_TABLES = ['Table 4', 'Table 7', 'Table 14', 'Table 21', 'VIP Lounge'];
 
-export default function App() {
+function RestaurantOSApp() {
+  const {
+    user,
+    customerProfile,
+    currentCafeId,
+    setCurrentCafeId,
+    refreshMembership,
+  } = useAuth();
+
+  const [appMode, setAppMode] = useState<'customer' | 'owner'>(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      return params.get('mode') === 'owner' || params.get('dashboard') === 'true'
+        ? 'owner'
+        : 'customer';
+    } catch {
+      return 'customer';
+    }
+  });
+  const [liveDishes, setLiveDishes] = useState<Dish[]>(DISHES);
+
+  useEffect(() => {
+    const unsubscribe = listenToDishes(currentCafeId, (dishes) => {
+      setLiveDishes(dishes);
+    });
+    return () => unsubscribe();
+  }, [currentCafeId]);
+
   const [viewMode, setViewMode] = useState<ViewMode>('interactive');
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('home');
-  const [activeNavTab, setActiveNavTab] = useState<NavTab>('home');
+  const [activeNavTab, setActiveNavTab] = useState<CustomerNavTab>('home');
   const [selectedDish, setSelectedDish] = useState<Dish>(DISHES[0]);
   const [isCartOpen, setIsCartOpen] = useState<boolean>(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState<boolean>(false);
+  const [isKdsOpen, setIsKdsOpen] = useState<boolean>(false);
+  const [activeOrdersCount, setActiveOrdersCount] = useState<number>(0);
 
   // Dynamic QR Table parsing from URL parameter (?table=X or ?t=X) with localStorage fallback
   const [currentTable, setCurrentTable] = useState<string>(() => {
@@ -69,6 +125,40 @@ export default function App() {
   // Cart starts empty initially so bottom order line only appears when items are selected
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
 
+  // Listen for real-time kitchen status changes on active order from Firestore
+  useEffect(() => {
+    if (!activeOrder?.id) return;
+
+    try {
+      const orderRef = doc(db, 'cafes', currentCafeId, 'orders', activeOrder.id);
+      const unsubscribe = onSnapshot(orderRef, (snap) => {
+        if (snap.exists()) {
+          const freshOrder = snap.data() as Order;
+          setActiveOrder(freshOrder);
+          localStorage.setItem('restaurantos_active_order', JSON.stringify(freshOrder));
+          // When order status is updated by kitchen, refresh loyalty balance if stamp awarded
+          if (freshOrder.stampAwarded) {
+            refreshMembership();
+          }
+        }
+      });
+      return () => unsubscribe();
+    } catch (err) {
+      console.warn('Real-time order listener fallback:', err);
+    }
+  }, [activeOrder?.id, currentCafeId]);
+
+  // Track active kitchen tickets count for KDS badge
+  useEffect(() => {
+    const unsubscribe = listenToCafeOrders(currentCafeId, (orders) => {
+      const activeCount = orders.filter(
+        (o) => o.status !== 'served' && o.status !== 'cancelled'
+      ).length;
+      setActiveOrdersCount(activeCount);
+    });
+    return () => unsubscribe();
+  }, [currentCafeId]);
+
   // Update table in localStorage and URL state
   const handleTableChange = (newTable: string) => {
     setCurrentTable(newTable);
@@ -79,7 +169,7 @@ export default function App() {
     }
   };
 
-  // Handle adding items to cart (or increasing quantity if already added)
+  // Handle adding items to cart
   const handleAddToCart = (
     dish: Dish,
     quantity = 1,
@@ -142,19 +232,41 @@ export default function App() {
     setIsCartOpen(false);
   };
 
-  const handleUpdateOrderStatus = (newStatus: OrderStatus) => {
+  const handleUpdateOrderStatus = async (newStatus: OrderStatus) => {
     if (activeOrder) {
       const updated = { ...activeOrder, status: newStatus };
       setActiveOrder(updated);
       try {
         localStorage.setItem('restaurantos_active_order', JSON.stringify(updated));
-      } catch {
-        // Ignore
+        await updateKitchenOrderStatus(currentCafeId, activeOrder.id, newStatus);
+      } catch (err) {
+        console.warn('Could not sync status with Firestore:', err);
       }
     }
   };
 
+  const handleNavTabClick = (tab: CustomerNavTab) => {
+    setActiveNavTab(tab);
+    if (tab === 'home') setCurrentScreen('home');
+    if (tab === 'rewards') setCurrentScreen('rewards');
+    if (tab === 'cart') setIsCartOpen(true);
+    if (tab === 'profile') setCurrentScreen('profile');
+  };
+
+  const activeCafe =
+    SUPPORTED_CAFES.find((c) => c.id === currentCafeId) || SUPPORTED_CAFES[0];
+
   const totalCartCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+
+  if (appMode === 'owner') {
+    return (
+      <OwnerDashboard
+        cafeId={currentCafeId}
+        onSelectCafe={setCurrentCafeId}
+        onSwitchToCustomerMenu={() => setAppMode('customer')}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-[#ede8e1] flex flex-col font-sans text-stone-900 antialiased selection:bg-[#82181a] selection:text-white">
@@ -172,59 +284,158 @@ export default function App() {
                   Restaurant<span className="text-amber-400">OS</span>
                 </span>
                 <span className="text-[10px] uppercase font-bold tracking-wider bg-white/10 text-stone-300 px-2 py-0.5 rounded-full border border-white/10">
-                  QR Ordering
+                  QR Dining
                 </span>
               </div>
               <p className="text-[11px] text-stone-400 hidden sm:block">
-                Dynamic QR Table · Live Kitchen Tracking · WhatsApp Member Club · Coupons
+                {activeCafe.name} · Real-time KDS & Automatic Loyalty Stamps
               </p>
             </div>
           </div>
 
-          {/* Mode Switcher Buttons */}
-          <div className="flex items-center gap-1.5 bg-stone-900/90 p-1 rounded-xl border border-stone-800 shadow-inner">
+          {/* Primary View Switcher: Customer QR Menu vs Owner Dashboard */}
+          <div className="flex items-center bg-stone-950 p-1 rounded-xl border border-stone-800 shadow-inner">
+            <button
+              onClick={() => {
+                setAppMode('customer');
+                try {
+                  const url = new URL(window.location.href);
+                  url.searchParams.delete('mode');
+                  window.history.replaceState({}, '', url.toString());
+                } catch {}
+              }}
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                appMode === 'customer'
+                  ? 'bg-[#82181a] text-white shadow-sm'
+                  : 'text-stone-400 hover:text-white'
+              }`}
+            >
+              <Smartphone className="w-3.5 h-3.5 text-amber-400" />
+              <span>Diner QR Menu</span>
+            </button>
+
+            <button
+              onClick={() => {
+                setAppMode('owner');
+                try {
+                  const url = new URL(window.location.href);
+                  url.searchParams.set('mode', 'owner');
+                  window.history.replaceState({}, '', url.toString());
+                } catch {}
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer text-white bg-[#e11d48] hover:bg-[#be123c] shadow-sm ring-1 ring-white/20"
+            >
+              <LayoutDashboard className="w-3.5 h-3.5 text-rose-200" />
+              <span>Owner Dashboard</span>
+            </button>
+          </div>
+
+          {/* Customer View Modes (Single / 3-Screen / Full Width) */}
+          <div className="hidden md:flex items-center gap-1 bg-stone-900/90 p-1 rounded-xl border border-stone-800">
             <button
               onClick={() => setViewMode('interactive')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'interactive'
-                  ? 'bg-[#82181a] text-white shadow-sm'
+                  ? 'bg-stone-800 text-white shadow-sm'
                   : 'text-stone-400 hover:text-white'
               }`}
               title="Interactive single mobile phone simulator"
             >
-              <Smartphone className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Single Device</span>
+              <Smartphone className="w-3 h-3" />
+              <span>Single</span>
             </button>
 
             <button
               onClick={() => setViewMode('triptych')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'triptych'
-                  ? 'bg-[#82181a] text-white shadow-sm'
+                  ? 'bg-stone-800 text-white shadow-sm'
                   : 'text-stone-400 hover:text-white'
               }`}
-              title="View all 3 phones side-by-side matching reference image"
+              title="View all 3 phones side-by-side"
             >
-              <Columns className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">3-Screen Studio</span>
+              <Columns className="w-3 h-3" />
+              <span>3-Screen</span>
             </button>
 
             <button
               onClick={() => setViewMode('responsive')}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                 viewMode === 'responsive'
-                  ? 'bg-[#82181a] text-white shadow-sm'
+                  ? 'bg-stone-800 text-white shadow-sm'
                   : 'text-stone-400 hover:text-white'
               }`}
               title="Full width viewport"
             >
-              <Maximize2 className="w-3.5 h-3.5" />
-              <span className="hidden md:inline">Full Width</span>
+              <Maximize2 className="w-3 h-3" />
+              <span>Full Width</span>
             </button>
           </div>
 
-          {/* Table Switcher & Cart button */}
+          {/* Management & Table Controls */}
           <div className="flex items-center gap-2">
+
+            {/* Multi-Restaurant Cafe Switcher */}
+            <div className="relative group hidden lg:block">
+              <div className="flex items-center gap-1.5 text-xs font-semibold text-stone-200 bg-stone-800/90 hover:bg-stone-800 px-2.5 py-1.5 rounded-lg border border-stone-700/80 cursor-pointer shadow-inner">
+                <MapPin className="w-3 h-3 text-amber-400" />
+                <span className="max-w-[120px] truncate">{activeCafe.name}</span>
+                <ChevronDown className="w-3 h-3 text-stone-400" />
+              </div>
+              <div className="absolute right-0 top-full mt-1.5 w-52 bg-[#1c1917] border border-stone-700 rounded-xl shadow-2xl p-1 z-50 hidden group-hover:block animate-in fade-in duration-150">
+                <span className="block text-[9px] uppercase font-bold text-stone-400 px-2 py-1">
+                  Select Restaurant Cafe
+                </span>
+                {SUPPORTED_CAFES.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setCurrentCafeId(c.id)}
+                    className={`w-full text-left px-2 py-1.5 text-xs rounded-lg transition-colors cursor-pointer ${
+                      currentCafeId === c.id
+                        ? 'bg-[#82181a] text-white font-bold'
+                        : 'text-stone-300 hover:bg-stone-800'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Kitchen KDS Management Display Button */}
+            <button
+              onClick={() => setIsKdsOpen(true)}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-stone-800/90 hover:bg-stone-700 text-amber-300 border border-stone-700 shadow-sm cursor-pointer transition-colors relative"
+              title="Open Kitchen Management & KDS"
+            >
+              <ChefHat className="w-3.5 h-3.5 text-amber-400" />
+              <span className="hidden sm:inline">Kitchen KDS</span>
+              {activeOrdersCount > 0 && (
+                <span className="bg-amber-400 text-stone-900 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                  {activeOrdersCount}
+                </span>
+              )}
+            </button>
+
+            {/* Customer Account Button */}
+            <button
+              onClick={() => {
+                if (user) {
+                  setCurrentScreen('profile');
+                  setActiveNavTab('profile');
+                } else {
+                  setIsAuthModalOpen(true);
+                }
+              }}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-stone-800/90 hover:bg-stone-700 text-stone-200 border border-stone-700 shadow-sm cursor-pointer transition-colors"
+              title="Customer Profile & Auth"
+            >
+              <User className="w-3.5 h-3.5 text-stone-300" />
+              <span className="hidden md:inline">
+                {user ? customerProfile?.fullName?.split(' ')[0] || 'Diner' : 'Sign In'}
+              </span>
+            </button>
+
             {/* Dynamic Table Selector for testing QR Scans */}
             <div className="relative group">
               <div className="flex items-center gap-1.5 text-xs font-semibold text-amber-300 bg-stone-800/90 hover:bg-stone-800 px-2.5 py-1.5 rounded-lg border border-stone-700/80 cursor-pointer shadow-inner">
@@ -294,11 +505,19 @@ export default function App() {
             cartItems={cartItems}
             onAddToCart={handleAddToCart}
             onUpdateQuantity={handleUpdateQuantity}
-            onOpenCart={() => setIsCartOpen(true)}
+            onOpenCart={() => {
+              setViewMode('interactive');
+              setIsCartOpen(true);
+            }}
             onOpenRewards={() => {
               setViewMode('interactive');
               setCurrentScreen('rewards');
               setActiveNavTab('rewards');
+            }}
+            onOpenProfile={() => {
+              setViewMode('interactive');
+              setCurrentScreen('profile');
+              setActiveNavTab('profile');
             }}
             currentTable={currentTable}
             onNavigateToHome={() => {
@@ -357,7 +576,20 @@ export default function App() {
                     : 'text-stone-600 hover:text-stone-900'
                 }`}
               >
-                4. Loyalty & WhatsApp
+                4. Rewards
+              </button>
+              <button
+                onClick={() => {
+                  setCurrentScreen('profile');
+                  setActiveNavTab('profile');
+                }}
+                className={`px-3 py-1 text-xs font-semibold rounded-xl transition-all cursor-pointer ${
+                  currentScreen === 'profile'
+                    ? 'bg-[#82181a] text-white shadow-xs'
+                    : 'text-stone-600 hover:text-stone-900'
+                }`}
+              >
+                5. Profile
               </button>
               {activeOrder && (
                 <button
@@ -369,12 +601,30 @@ export default function App() {
                   }`}
                 >
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping"></span>
-                  5. Kitchen Ticket
+                  6. Ticket
                 </button>
               )}
             </div>
 
-            <PhoneFrame>
+            <PhoneFrame
+              overlay={
+                <CartDrawer
+                  isOpen={isCartOpen}
+                  onClose={() => setIsCartOpen(false)}
+                  cartItems={cartItems}
+                  onUpdateQuantity={handleUpdateQuantity}
+                  onRemoveItem={handleRemoveItem}
+                  onClearCart={handleClearCart}
+                  currentTable={currentTable}
+                  onOrderConfirmed={handleOrderConfirmed}
+                />
+              }
+            >
+              {/* Real-time Order Alert Banner */}
+              <CustomerNotificationBanner
+                onOpenOrderStatus={() => setCurrentScreen('order_status')}
+              />
+
               {currentScreen === 'onboarding' && (
                 <OnboardingScreen
                   onStart={() => setCurrentScreen('home')}
@@ -393,16 +643,16 @@ export default function App() {
                     setCurrentScreen('rewards');
                     setActiveNavTab('rewards');
                   }}
+                  onOpenProfile={() => {
+                    setCurrentScreen('profile');
+                    setActiveNavTab('profile');
+                  }}
                   currentTable={currentTable}
                   activeNavTab={activeNavTab}
-                  setActiveNavTab={(tab) => {
-                    setActiveNavTab(tab);
-                    if (tab === 'rewards') setCurrentScreen('rewards');
-                    if (tab === 'home') setCurrentScreen('home');
-                    if (tab === 'cart') setIsCartOpen(true);
-                  }}
+                  setActiveNavTab={handleNavTabClick}
                   activeOrder={activeOrder}
                   onOpenOrderStatus={() => setCurrentScreen('order_status')}
+                  dishes={liveDishes}
                 />
               )}
 
@@ -444,13 +694,50 @@ export default function App() {
                       setCurrentScreen('home');
                       setActiveNavTab('home');
                     }}
-                    activeNavTab={activeNavTab}
-                    setActiveNavTab={(tab) => {
-                      setActiveNavTab(tab);
-                      if (tab === 'rewards') setCurrentScreen('rewards');
-                      if (tab === 'home') setCurrentScreen('home');
-                      if (tab === 'cart') setIsCartOpen(true);
+                    onOpenProfile={() => {
+                      setCurrentScreen('profile');
+                      setActiveNavTab('profile');
                     }}
+                    activeNavTab={activeNavTab}
+                    setActiveNavTab={handleNavTabClick}
+                    onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                  />
+                </div>
+              )}
+
+              {currentScreen === 'profile' && (
+                <div className="flex-1 flex flex-col h-full">
+                  <div className="bg-[#82181a] px-4 pt-3 flex items-center justify-between">
+                    <button
+                      onClick={() => {
+                        setCurrentScreen('home');
+                        setActiveNavTab('home');
+                      }}
+                      className="text-xs font-semibold text-white/90 hover:text-white flex items-center gap-1 cursor-pointer"
+                    >
+                      ← Back to Menu
+                    </button>
+                  </div>
+                  <CustomerProfileScreen
+                    onBackToMenu={() => {
+                      setCurrentScreen('home');
+                      setActiveNavTab('home');
+                    }}
+                    onOpenRewards={() => {
+                      setCurrentScreen('rewards');
+                      setActiveNavTab('rewards');
+                    }}
+                    onOpenCart={() => setIsCartOpen(true)}
+                    onOpenOrderStatus={(ord) => {
+                      setActiveOrder(ord);
+                      setCurrentScreen('order_status');
+                    }}
+                    onSelectDish={handleSelectDish}
+                    currentTable={currentTable}
+                    cartItems={cartItems}
+                    activeNavTab={activeNavTab}
+                    setActiveNavTab={handleNavTabClick}
+                    onOpenAuthModal={() => setIsAuthModalOpen(true)}
                   />
                 </div>
               )}
@@ -467,6 +754,10 @@ export default function App() {
                     setActiveNavTab('home');
                   }}
                   onUpdateStatus={handleUpdateOrderStatus}
+                  onNavigateToRewards={() => {
+                    setCurrentScreen('rewards');
+                    setActiveNavTab('rewards');
+                  }}
                 />
               )}
             </PhoneFrame>
@@ -475,7 +766,11 @@ export default function App() {
 
         {/* VIEW MODE 3: FULL WIDTH RESPONSIVE VIEW */}
         {viewMode === 'responsive' && (
-          <div className="w-full max-w-2xl bg-[#faf7f2] rounded-3xl shadow-xl border border-stone-300 overflow-hidden min-h-[85vh] flex flex-col">
+          <div className="w-full max-w-2xl bg-[#faf7f2] rounded-3xl shadow-xl border border-stone-300 overflow-hidden min-h-[85vh] flex flex-col relative">
+            <CustomerNotificationBanner
+              onOpenOrderStatus={() => setCurrentScreen('order_status')}
+            />
+
             {currentScreen === 'onboarding' && (
               <OnboardingScreen
                 onStart={() => setCurrentScreen('home')}
@@ -494,16 +789,16 @@ export default function App() {
                   setCurrentScreen('rewards');
                   setActiveNavTab('rewards');
                 }}
+                onOpenProfile={() => {
+                  setCurrentScreen('profile');
+                  setActiveNavTab('profile');
+                }}
                 currentTable={currentTable}
                 activeNavTab={activeNavTab}
-                setActiveNavTab={(tab) => {
-                  setActiveNavTab(tab);
-                  if (tab === 'rewards') setCurrentScreen('rewards');
-                  if (tab === 'home') setCurrentScreen('home');
-                  if (tab === 'cart') setIsCartOpen(true);
-                }}
+                setActiveNavTab={handleNavTabClick}
                 activeOrder={activeOrder}
                 onOpenOrderStatus={() => setCurrentScreen('order_status')}
+                dishes={liveDishes}
               />
             )}
 
@@ -545,13 +840,50 @@ export default function App() {
                     setCurrentScreen('home');
                     setActiveNavTab('home');
                   }}
-                  activeNavTab={activeNavTab}
-                  setActiveNavTab={(tab) => {
-                    setActiveNavTab(tab);
-                    if (tab === 'rewards') setCurrentScreen('rewards');
-                    if (tab === 'home') setCurrentScreen('home');
-                    if (tab === 'cart') setIsCartOpen(true);
+                  onOpenProfile={() => {
+                    setCurrentScreen('profile');
+                    setActiveNavTab('profile');
                   }}
+                  activeNavTab={activeNavTab}
+                  setActiveNavTab={handleNavTabClick}
+                  onOpenAuthModal={() => setIsAuthModalOpen(true)}
+                />
+              </div>
+            )}
+
+            {currentScreen === 'profile' && (
+              <div className="flex-1 flex flex-col h-full relative">
+                <div className="bg-[#82181a] px-4 pt-3 flex items-center justify-between">
+                  <button
+                    onClick={() => {
+                      setCurrentScreen('home');
+                      setActiveNavTab('home');
+                    }}
+                    className="text-xs font-semibold text-white/90 hover:text-white flex items-center gap-1 cursor-pointer"
+                  >
+                    ← Back to Menu
+                  </button>
+                </div>
+                <CustomerProfileScreen
+                  onBackToMenu={() => {
+                    setCurrentScreen('home');
+                    setActiveNavTab('home');
+                  }}
+                  onOpenRewards={() => {
+                    setCurrentScreen('rewards');
+                    setActiveNavTab('rewards');
+                  }}
+                  onOpenCart={() => setIsCartOpen(true)}
+                  onOpenOrderStatus={(ord) => {
+                    setActiveOrder(ord);
+                    setCurrentScreen('order_status');
+                  }}
+                  onSelectDish={handleSelectDish}
+                  currentTable={currentTable}
+                  cartItems={cartItems}
+                  activeNavTab={activeNavTab}
+                  setActiveNavTab={handleNavTabClick}
+                  onOpenAuthModal={() => setIsAuthModalOpen(true)}
                 />
               </div>
             )}
@@ -568,30 +900,59 @@ export default function App() {
                   setActiveNavTab('home');
                 }}
                 onUpdateStatus={handleUpdateOrderStatus}
+                onNavigateToRewards={() => {
+                  setCurrentScreen('rewards');
+                  setActiveNavTab('rewards');
+                }}
               />
             )}
+
+            {/* In-Frame Cart Drawer */}
+            <CartDrawer
+              isOpen={isCartOpen}
+              onClose={() => setIsCartOpen(false)}
+              cartItems={cartItems}
+              onUpdateQuantity={handleUpdateQuantity}
+              onRemoveItem={handleRemoveItem}
+              onClearCart={handleClearCart}
+              currentTable={currentTable}
+              onOrderConfirmed={handleOrderConfirmed}
+            />
           </div>
         )}
       </main>
 
-      {/* Bill & Order Drawer Overlay */}
-      <CartDrawer
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        cartItems={cartItems}
-        onUpdateQuantity={handleUpdateQuantity}
-        onRemoveItem={handleRemoveItem}
-        onClearCart={handleClearCart}
-        currentTable={currentTable}
-        onOrderConfirmed={handleOrderConfirmed}
+      {/* Customer Authentication Modal */}
+      <CustomerAuthModal
+        isOpen={isAuthModalOpen}
+        onClose={() => setIsAuthModalOpen(false)}
+        onSuccess={() => {
+          setCurrentScreen('profile');
+          setActiveNavTab('profile');
+        }}
+      />
+
+      {/* Kitchen Management & KDS Drawer */}
+      <KitchenKdsDrawer
+        isOpen={isKdsOpen}
+        onClose={() => setIsKdsOpen(false)}
+        cafeId={currentCafeId}
       />
 
       {/* Footer Design Notes */}
       <footer className="py-3 px-4 text-center text-xs text-stone-500 bg-[#ede8e1] border-t border-stone-300">
         <p className="max-w-xl mx-auto">
-          RestaurantOS Customer QR Interface · Dynamic QR Table ({currentTable}), live order tracking, WhatsApp Diner Club, and promo coupon engine.
+          RestaurantOS QR Interface · Multi-Tenant ({activeCafe.name}), Live KDS Kitchen Order Management, Phone OTP Customer Auth & Atomic Loyalty Stamp Engine.
         </p>
       </footer>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <RestaurantOSApp />
+    </AuthProvider>
   );
 }

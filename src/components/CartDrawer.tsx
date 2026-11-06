@@ -17,6 +17,8 @@ import {
 } from 'lucide-react';
 import { CartItem, Order, Coupon } from '../types/restaurant';
 import { AVAILABLE_COUPONS } from '../data/menuData';
+import { useAuth } from '../contexts/AuthContext';
+import { placeRestaurantOrder, registerLoyaltyMembership } from '../services/restaurantService';
 
 interface CartDrawerProps {
   isOpen: boolean;
@@ -50,13 +52,19 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   const [couponError, setCouponError] = useState<string | null>(null);
   const [couponSuccess, setCouponSuccess] = useState<string | null>(null);
 
-  // Load saved phone number if customer previously used it
+  const { user, customerProfile, loyaltyMembership, currentCafeId } = useAuth();
+
+  // Load saved phone number if customer previously used it or from profile
   useEffect(() => {
-    const savedPhone = localStorage.getItem('restaurantos_customer_phone');
-    if (savedPhone) {
-      setWhatsappNumber(savedPhone);
+    if (customerProfile?.phone) {
+      setWhatsappNumber(customerProfile.phone);
+    } else {
+      const savedPhone = localStorage.getItem('restaurantos_customer_phone');
+      if (savedPhone) {
+        setWhatsappNumber(savedPhone);
+      }
     }
-  }, []);
+  }, [customerProfile]);
 
   if (!isOpen) return null;
 
@@ -112,13 +120,22 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
   };
 
   const handleSendOrder = () => {
+    const trimmedPhone = whatsappNumber.trim();
     // Save phone number if entered
-    if (whatsappNumber.trim()) {
-      localStorage.setItem('restaurantos_customer_phone', whatsappNumber.trim());
+    if (trimmedPhone) {
+      localStorage.setItem('restaurantos_customer_phone', trimmedPhone);
       if (joinClub) {
         localStorage.setItem('restaurantos_club_member', 'true');
       }
     }
+
+    const hasJoinedMembership = Boolean(
+      (trimmedPhone.length >= 10 && joinClub) ||
+      customerProfile?.phone ||
+      customerProfile?.email ||
+      loyaltyMembership ||
+      localStorage.getItem('restaurantos_club_member') === 'true'
+    );
 
     // Build Order object
     const ticketNum = Math.floor(100 + Math.random() * 900);
@@ -126,6 +143,8 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       id: `ord_${Date.now()}`,
       ticketNumber: ticketNum,
       table: currentTable,
+      cafeId: currentCafeId,
+      customerId: user?.uid || (trimmedPhone ? `cust_${trimmedPhone}` : undefined),
       items: [...cartItems],
       subtotal,
       tax,
@@ -135,13 +154,32 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       total,
       status: 'received',
       createdAt: Date.now(),
-      estimatedMinutes: 14 + cartItems.length * 2,
+      estimatedMinutes: 12 + cartItems.length * 2,
       kitchenNotes: kitchenNotes.trim() || undefined,
-      customerPhone: whatsappNumber.trim() || undefined,
-      whatsappOptIn: whatsappOptIn && !!whatsappNumber.trim(),
+      customerPhone: trimmedPhone || customerProfile?.phone || undefined,
+      customerEmail: customerProfile?.email || undefined,
+      customerName: customerProfile?.fullName || (trimmedPhone ? `Guest ${trimmedPhone.slice(-4)}` : undefined),
+      isMember: hasJoinedMembership,
+      whatsappOptIn: whatsappOptIn && !!trimmedPhone,
+      stampAwarded: false,
     };
 
-    // Save to persistent localStorage order history
+    // Auto-register membership in Firestore if user chose to join club
+    if (joinClub && trimmedPhone.length >= 10) {
+      const memberUid = user?.uid || `cust_${trimmedPhone}`;
+      registerLoyaltyMembership(currentCafeId, {
+        uid: memberUid,
+        phone: trimmedPhone,
+        fullName: customerProfile?.fullName || `Guest ${trimmedPhone.slice(-4)}`,
+        whatsappNumber: trimmedPhone,
+        email: customerProfile?.email || '',
+        stamps: 0,
+        whatsappOptIn,
+        joinedAt: new Date().toISOString(),
+      }).catch((err) => console.warn('Membership auto-reg:', err));
+    }
+
+    // 1. Immediately save to persistent localStorage
     try {
       const existing = JSON.parse(localStorage.getItem('restaurantos_orders') || '[]');
       localStorage.setItem('restaurantos_orders', JSON.stringify([newOrder, ...existing]));
@@ -150,17 +188,23 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
       // Ignore storage quota
     }
 
+    // 2. Instant zero-latency UI transition: clear cart, close drawer, show order ticket
     onClearCart();
     onClose();
 
     if (onOrderConfirmed) {
       onOrderConfirmed(newOrder);
     }
+
+    // 3. Save to Firestore in background without delaying user
+    placeRestaurantOrder(currentCafeId, newOrder).catch((err) => {
+      console.warn('Background Firestore order dispatch:', err);
+    });
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/65 backdrop-blur-xs animate-in fade-in duration-200">
-      <div className="relative w-full max-w-[430px] max-h-[90vh] bg-[#faf7f2] rounded-t-[32px] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom-8 duration-200">
+    <div className="absolute inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-xs animate-in fade-in duration-150 overflow-hidden">
+      <div className="relative w-full max-h-[92%] bg-[#faf7f2] rounded-t-[32px] flex flex-col overflow-hidden shadow-2xl animate-in slide-in-from-bottom-6 duration-200">
         {/* Drawer Grab Handle */}
         <div className="w-12 h-1.5 bg-stone-300 rounded-full mx-auto my-3 shrink-0"></div>
 
