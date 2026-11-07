@@ -18,6 +18,7 @@ import {
   Award,
   Coffee,
   HeartHandshake,
+  Gift,
 } from 'lucide-react';
 import { Order, OrderStatus } from '../types/restaurant';
 import { checkAndAdvanceOrderSteps } from '../services/restaurantService';
@@ -315,17 +316,31 @@ export const OrderStatusScreen: React.FC<OrderStatusScreenProps> = ({
                   <div className="grid grid-cols-5 gap-2">
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((slot) => {
                       const isStamped = slot <= 1; // At least this newly earned stamp
+                      const isLastStamp = slot === 10;
                       return (
                         <div
                           key={slot}
                           className={`aspect-square rounded-xl flex flex-col items-center justify-center transition-all ${
                             isStamped
-                              ? 'bg-amber-400 text-stone-950 font-bold shadow-md shadow-amber-400/30 ring-2 ring-white/50'
+                              ? isLastStamp
+                                ? 'bg-amber-400 text-stone-950 font-bold shadow-md shadow-amber-400/30 ring-2 ring-white/50'
+                                : 'bg-amber-400 text-stone-950 font-bold shadow-md shadow-amber-400/30 ring-2 ring-white/50'
+                              : isLastStamp
+                              ? 'bg-amber-400/20 border-2 border-amber-400 text-amber-200'
                               : 'bg-white/10 border border-white/20 text-white/40'
                           }`}
                         >
                           {isStamped ? (
-                            <Coffee className="w-4 h-4 fill-stone-950" />
+                            isLastStamp ? (
+                              <Gift className="w-4 h-4 text-stone-950 stroke-[2.4]" />
+                            ) : (
+                              <Coffee className="w-4 h-4 fill-stone-950" />
+                            )
+                          ) : isLastStamp ? (
+                            <div className="flex flex-col items-center justify-center">
+                              <Gift className="w-4 h-4 text-amber-300 stroke-[2.3] animate-bounce" />
+                              <span className="text-[7px] font-bold text-amber-200 uppercase mt-0.5">Gift 🎁</span>
+                            </div>
                           ) : (
                             <span className="text-[10px] font-mono">{slot}</span>
                           )}

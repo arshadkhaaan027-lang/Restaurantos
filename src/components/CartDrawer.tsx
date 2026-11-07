@@ -139,12 +139,16 @@ export const CartDrawer: React.FC<CartDrawerProps> = ({
 
     // Build Order object
     const ticketNum = Math.floor(100 + Math.random() * 900);
+    const derivedCustomerId =
+      user?.uid ||
+      (trimmedPhone ? `cust_${trimmedPhone}` : `table_${currentTable.toLowerCase().replace(/\s+/g, '_')}_${ticketNum}`);
+
     const newOrder: Order = {
       id: `ord_${Date.now()}`,
       ticketNumber: ticketNum,
       table: currentTable,
       cafeId: currentCafeId,
-      customerId: user?.uid || (trimmedPhone ? `cust_${trimmedPhone}` : undefined),
+      customerId: derivedCustomerId,
       items: [...cartItems],
       subtotal,
       tax,

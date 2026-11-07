@@ -7,9 +7,6 @@ import {
   Bell,
   Maximize2,
   Smartphone,
-  ChevronDown,
-  MapPin,
-  CheckCircle,
 } from 'lucide-react';
 import { SUPPORTED_CAFES } from '../../services/restaurantService';
 
@@ -17,7 +14,7 @@ interface TopNavbarProps {
   onToggleSidebar: () => void;
   onSwitchToCustomerMenu: () => void;
   currentCafeId: string;
-  onSelectCafe: (id: string) => void;
+  onSelectCafe?: (id: string) => void;
   pendingOrdersCount?: number;
 }
 
@@ -25,12 +22,10 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
   onToggleSidebar,
   onSwitchToCustomerMenu,
   currentCafeId,
-  onSelectCafe,
   pendingOrdersCount = 0,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isDarkMode, setIsDarkMode] = useState(false);
-  const [showCafeDropdown, setShowCafeDropdown] = useState(false);
   const [showNotificationToast, setShowNotificationToast] = useState(false);
 
   const activeCafe =
@@ -81,47 +76,6 @@ export const TopNavbar: React.FC<TopNavbarProps> = ({
           <span className="hidden sm:inline">Diner QR Menu</span>
           <span className="sm:hidden text-[10px]">QR Menu</span>
         </button>
-
-        {/* Multi-tenant Cafe Selector */}
-        <div className="relative">
-          <button
-            onClick={() => setShowCafeDropdown(!showCafeDropdown)}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-stone-50 hover:bg-stone-100 border border-stone-200 text-xs font-medium text-stone-700 cursor-pointer transition-colors"
-          >
-            <MapPin className="w-3.5 h-3.5 text-[#e11d48]" />
-            <span className="hidden md:inline max-w-[130px] truncate">
-              {activeCafe.name}
-            </span>
-            <ChevronDown className="w-3.5 h-3.5 text-stone-400" />
-          </button>
-
-          {showCafeDropdown && (
-            <div className="absolute right-0 top-full mt-1.5 w-56 bg-white rounded-xl shadow-xl border border-stone-200 p-1.5 z-50 animate-in fade-in zoom-in-95 duration-150">
-              <div className="px-2.5 py-1 text-[10px] font-bold text-stone-400 uppercase tracking-wider">
-                Select Location
-              </div>
-              {SUPPORTED_CAFES.map((cafe) => (
-                <button
-                  key={cafe.id}
-                  onClick={() => {
-                    onSelectCafe(cafe.id);
-                    setShowCafeDropdown(false);
-                  }}
-                  className={`w-full text-left px-2.5 py-2 text-xs rounded-lg flex items-center justify-between cursor-pointer transition-colors ${
-                    currentCafeId === cafe.id
-                      ? 'bg-rose-50 text-[#e11d48] font-bold'
-                      : 'text-stone-700 hover:bg-stone-50'
-                  }`}
-                >
-                  <span className="truncate">{cafe.name}</span>
-                  {currentCafeId === cafe.id && (
-                    <CheckCircle className="w-3.5 h-3.5 text-[#e11d48]" />
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
 
         {/* Theme pill matching sun/moon toggle in reference screenshot */}
         <div className="flex items-center bg-stone-100 p-0.5 rounded-xl border border-stone-200/80">

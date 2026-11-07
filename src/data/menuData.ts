@@ -2,6 +2,7 @@ import { Dish, RewardItem } from '../types/restaurant';
 
 export const CATEGORIES = [
   { id: 'all', label: 'All Items', icon: 'utensils' },
+  { id: 'specials', label: "Today's Special", icon: 'sparkles' },
   { id: 'coffee', label: 'Specialty Coffee', icon: 'coffee' },
   { id: 'brunch', label: 'All-Day Brunch', icon: 'sun' },
   { id: 'sandwiches', label: 'Sandwiches & Melts', icon: 'sandwich' },

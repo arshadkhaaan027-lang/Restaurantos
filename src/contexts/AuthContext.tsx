@@ -99,7 +99,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   useEffect(() => {
+    let isMounted = true;
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (!currentUser) {
+        try {
+          await signInAnonymously(auth);
+          return;
+        } catch {
+          // Anonymous auth fallback if not enabled in console
+        }
+      }
+
+      if (!isMounted) return;
       setUser(currentUser);
       if (currentUser) {
         await loadUserData(currentUser, currentCafeId);
@@ -110,7 +121,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      isMounted = false;
+      unsubscribe();
+    };
   }, [currentCafeId]);
 
   const refreshMembership = async () => {

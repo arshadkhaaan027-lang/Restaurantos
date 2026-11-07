@@ -14,7 +14,7 @@ import {
   getDocs,
   Unsubscribe,
 } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './firebase';
+import { db, handleFirestoreError, OperationType, removeUndefinedFields } from './firebase';
 import { DISHES } from '../data/menuData';
 import {
   Dish,
@@ -222,7 +222,7 @@ export async function placeRestaurantOrder(
   const path = `cafes/${cafeId}/orders/${order.id}`;
   try {
     const orderRef = doc(db, 'cafes', cafeId, 'orders', order.id);
-    const cleanOrder: Order = {
+    const rawOrder: Order = {
       ...order,
       cafeId,
       status: 'received',
@@ -230,6 +230,7 @@ export async function placeRestaurantOrder(
       updatedAt: Date.now(),
       stampAwarded: false,
     };
+    const cleanOrder = removeUndefinedFields(rawOrder);
     await setDoc(orderRef, cleanOrder);
 
     // If customer is known, send initial received notification

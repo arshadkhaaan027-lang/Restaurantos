@@ -16,6 +16,7 @@ import {
   Mail,
   Calendar,
   Clock,
+  Coffee,
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import {
@@ -358,22 +359,38 @@ export const RewardsScreen: React.FC<RewardsScreenProps> = ({
               <div className="grid grid-cols-5 gap-2.5 py-4">
                 {stampSlots.map((isEarned, index) => {
                   const stampNumber = index + 1;
-                  const isMilestone = stampNumber === 5 || stampNumber === 10;
+                  const isLastStamp = stampNumber === 10;
 
                   return (
                     <div key={index} className="flex flex-col items-center gap-1">
                       <div
                         className={`relative w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
                           isEarned
-                            ? 'bg-gradient-to-br from-[#82181a] to-[#5b0f11] text-amber-200 shadow-sm shadow-[#82181a]/20 scale-100'
+                            ? isLastStamp
+                              ? 'bg-gradient-to-br from-amber-500 via-[#82181a] to-rose-950 text-amber-200 shadow-md ring-2 ring-amber-400 scale-105'
+                              : 'bg-gradient-to-br from-[#82181a] to-[#5b0f11] text-amber-200 shadow-sm shadow-[#82181a]/20 scale-100'
+                            : isLastStamp
+                            ? 'bg-gradient-to-br from-amber-50 to-orange-50 border-2 border-amber-400/90 text-amber-600 shadow-xs'
                             : 'bg-[#faf7f2] border-2 border-dashed border-stone-300 text-stone-400'
                         }`}
                       >
                         {isEarned ? (
                           <div className="flex flex-col items-center justify-center">
-                            <UtensilsCrossed className="w-4 h-4 text-amber-200 stroke-[2.2]" />
+                            {isLastStamp ? (
+                              <Gift className="w-5 h-5 text-amber-300 stroke-[2.4] animate-pulse" />
+                            ) : (
+                              <Coffee className="w-4 h-4 text-amber-200 stroke-[2.2]" />
+                            )}
                             <span className="text-[8px] font-bold text-amber-300 -mt-0.5">
-                              ✓
+                              {isLastStamp ? '🎁 Gift' : '✓'}
+                            </span>
+                          </div>
+                        ) : isLastStamp ? (
+                          /* Slot 10: Gift icon */
+                          <div className="flex flex-col items-center justify-center">
+                            <Gift className="w-5 h-5 text-amber-600 stroke-[2.3] animate-bounce" />
+                            <span className="text-[7px] font-black uppercase tracking-wider text-amber-700">
+                              Gift 🎁
                             </span>
                           </div>
                         ) : (
@@ -382,13 +399,13 @@ export const RewardsScreen: React.FC<RewardsScreenProps> = ({
                           </span>
                         )}
 
-                        {/* Milestone Crown */}
-                        {isMilestone && !isEarned && (
-                          <Gift className="w-3 h-3 text-amber-500 absolute -top-1.5 -right-1.5" />
+                        {/* Milestone sparkles on 5th stamp */}
+                        {stampNumber === 5 && !isEarned && (
+                          <Sparkles className="w-3 h-3 text-amber-500 absolute -top-1.5 -right-1.5" />
                         )}
                       </div>
                       <span className="text-[9px] font-medium text-stone-500">
-                        {isMilestone ? (stampNumber === 5 ? 'Free Dish' : 'Prime Steak') : `Visit ${stampNumber}`}
+                        {isLastStamp ? 'Gift 🎁' : stampNumber === 5 ? 'Free Brew' : `Visit ${stampNumber}`}
                       </span>
                     </div>
                   );
